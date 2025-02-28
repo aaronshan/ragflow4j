@@ -1,1 +1,21 @@
- 
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.logs
+.project
+.classpath
+.settings/
+
+# Development notes
+ragflow4j-note/
+
+# Mac OS
+.DS_Store
