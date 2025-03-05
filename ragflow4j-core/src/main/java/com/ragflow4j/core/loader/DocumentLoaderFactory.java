@@ -17,6 +17,8 @@ public class DocumentLoaderFactory {
         // Register default loaders
         registerLoader(new TextDocumentLoader());
         registerLoader(new PdfDocumentLoader());
+        registerLoader(new WordDocumentLoader());
+        registerLoader(new MarkdownDocumentLoader());
     }
     
     /**
