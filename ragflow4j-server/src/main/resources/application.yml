@@ -1,0 +1,15 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: ragflow4j-server
+  profiles:
+    active: dev
+
+logging:
+  level:
+    root: INFO
+    com.ragflow4j: DEBUG 
