@@ -103,5 +103,12 @@
             <artifactId>tokenizers</artifactId>
             <version>0.28.0</version>
         </dependency>
+
+        <!-- Milvus Vector DB -->
+        <dependency>
+            <groupId>io.milvus</groupId>
+            <artifactId>milvus-sdk-java</artifactId>
+            <version>2.3.10</version>
+        </dependency>
     </dependencies>
-</project> 
+</project>
