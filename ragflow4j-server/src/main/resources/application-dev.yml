@@ -1,0 +1,50 @@
+# 开发环境配置
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:ragflow4j;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+    platform: h2
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+# Milvus配置
+milvus:
+  host: localhost
+  port: 19530
+  collection-prefix: ragflow4j_
+
+# 文件上传配置
+file:
+  upload-dir: ./uploads
+  max-size: 10MB
+  allowed-types: pdf,doc,docx,txt,md,html
+
+# 缓存配置
+cache:
+  type: caffeine
+  vector-ttl: 3600
+  query-ttl: 300
+
+# 日志配置
+logging:
+  level:
+    com.ragflow4j: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
