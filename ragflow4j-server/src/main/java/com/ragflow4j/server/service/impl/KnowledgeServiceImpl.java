@@ -1,7 +1,9 @@
 package com.ragflow4j.server.service.impl;
 
-import com.ragflow4j.server.model.Document;
-import com.ragflow4j.server.repository.DocumentRepository;
+import com.ragflow4j.server.entity.Knowledge;
+import com.ragflow4j.server.entity.User;
+import com.ragflow4j.server.repository.KnowledgeRepository;
+import com.ragflow4j.server.repository.UserRepository;
 import com.ragflow4j.server.service.KnowledgeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -14,73 +16,108 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * 知识管理服务实现类
+ * 知识库管理服务实现类
  */
 @Service
 @Transactional
 public class KnowledgeServiceImpl implements KnowledgeService {
 
-    private final DocumentRepository documentRepository;
+    private final KnowledgeRepository knowledgeRepository;
+    private final UserRepository userRepository;
     
     @Autowired
-    public KnowledgeServiceImpl(DocumentRepository documentRepository) {
-        this.documentRepository = documentRepository;
+    public KnowledgeServiceImpl(KnowledgeRepository knowledgeRepository, UserRepository userRepository) {
+        this.knowledgeRepository = knowledgeRepository;
+        this.userRepository = userRepository;
     }
     
     @Override
-    public Document saveDocument(Document document) {
-        return documentRepository.save(document);
-    }
-    
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<Document> findDocumentById(UUID id) {
-        return documentRepository.findById(id);
+    public Knowledge saveKnowledge(Knowledge knowledge) {
+        return knowledgeRepository.save(knowledge);
     }
     
     @Override
     @Transactional(readOnly = true)
-    public List<Document> findDocumentsByType(String documentType) {
-        return documentRepository.findByDocumentType(documentType);
+    public Optional<Knowledge> findKnowledgeById(Long id) {
+        return knowledgeRepository.findById(id);
     }
     
     @Override
     @Transactional(readOnly = true)
-    public List<Document> searchDocumentsByTitle(String keyword) {
-        return documentRepository.findByTitleContaining(keyword);
+    public List<Knowledge> findKnowledgesByType(String type) {
+        return knowledgeRepository.findByType(type);
     }
     
     @Override
     @Transactional(readOnly = true)
-    public Page<Document> getAllDocuments(Pageable pageable) {
-        return documentRepository.findAll(pageable);
+    public List<Knowledge> searchKnowledgesByName(String keyword) {
+        return knowledgeRepository.findByNameContaining(keyword);
     }
     
     @Override
-    public void deleteDocument(UUID id) {
-        documentRepository.deleteById(id);
+    @Transactional(readOnly = true)
+    public Page<Knowledge> getAllKnowledges(Pageable pageable) {
+        return knowledgeRepository.findAll(pageable);
     }
     
     @Override
-    public Document updateDocument(UUID id, Document document) {
-        Optional<Document> existingDocument = documentRepository.findById(id);
-        if (existingDocument.isPresent()) {
-            Document updatedDocument = existingDocument.get();
-            updatedDocument.setTitle(document.getTitle());
-            updatedDocument.setContent(document.getContent());
-            updatedDocument.setDocumentType(document.getDocumentType());
-            updatedDocument.setSource(document.getSource());
-            updatedDocument.setMetadata(document.getMetadata());
-            updatedDocument.setVectorId(document.getVectorId());
-            return documentRepository.save(updatedDocument);
+    public void deleteKnowledge(Long id) {
+        knowledgeRepository.deleteById(id);
+    }
+    
+    @Override
+    public Knowledge updateKnowledge(Long id, Knowledge knowledge) {
+        Optional<Knowledge> existingKnowledge = knowledgeRepository.findById(id);
+        if (existingKnowledge.isPresent()) {
+            Knowledge updatedKnowledge = existingKnowledge.get();
+            updatedKnowledge.setName(knowledge.getName());
+            updatedKnowledge.setDescription(knowledge.getDescription());
+            updatedKnowledge.setType(knowledge.getType());
+            return knowledgeRepository.save(updatedKnowledge);
         } else {
-            throw new RuntimeException("Document not found with id: " + id);
+            throw new RuntimeException("Knowledge base not found with id: " + id);
         }
     }
     
     @Override
     @Transactional(readOnly = true)
-    public Optional<Document> findDocumentByVectorId(String vectorId) {
-        return Optional.ofNullable(documentRepository.findByVectorId(vectorId));
+    public List<Knowledge> findKnowledgesByOwner(User owner) {
+        return knowledgeRepository.findByOwner(owner);
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<Knowledge> findKnowledgesByAuthorizedUser(User user) {
+        return knowledgeRepository.findByAuthorizedUsersContaining(user);
+    }
+    
+    @Override
+    public void authorizeUser(Long knowledgeBaseId, UUID userId) {
+        Optional<Knowledge> knowledgeOpt = knowledgeRepository.findById(knowledgeBaseId);
+        Optional<User> userOpt = userRepository.findById(userId);
+        
+        if (knowledgeOpt.isPresent() && userOpt.isPresent()) {
+            Knowledge knowledge = knowledgeOpt.get();
+            User user = userOpt.get();
+            knowledge.addAuthorizedUser(user);
+            knowledgeRepository.save(knowledge);
+        } else {
+            throw new RuntimeException("Knowledge base or user not found");
+        }
+    }
+    
+    @Override
+    public void revokeUserAuthorization(Long knowledgeBaseId, UUID userId) {
+        Optional<Knowledge> knowledgeOpt = knowledgeRepository.findById(knowledgeBaseId);
+        Optional<User> userOpt = userRepository.findById(userId);
+        
+        if (knowledgeOpt.isPresent() && userOpt.isPresent()) {
+            Knowledge knowledge = knowledgeOpt.get();
+            User user = userOpt.get();
+            knowledge.removeAuthorizedUser(user);
+            knowledgeRepository.save(knowledge);
+        } else {
+            throw new RuntimeException("Knowledge base or user not found");
+        }
     }
 }

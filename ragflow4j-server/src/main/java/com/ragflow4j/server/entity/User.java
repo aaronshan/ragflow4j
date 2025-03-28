@@ -7,6 +7,8 @@ import lombok.Builder;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 用户实体类
@@ -65,6 +67,19 @@ public class User {
     public enum UserStatus {
         ACTIVE, INACTIVE, LOCKED
     }
+
+    /**
+     * 用户拥有的知识库
+     */
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Set<Knowledge> ownedKnowledgeBases = new HashSet<>();
+    
+    /**
+     * 用户有权访问的知识库
+     */
+    @ManyToMany(mappedBy = "authorizedUsers", fetch = FetchType.LAZY)
+    private Set<Knowledge> accessibleKnowledgeBases = new HashSet<>();
+
 
     @PrePersist
     protected void onCreate() {

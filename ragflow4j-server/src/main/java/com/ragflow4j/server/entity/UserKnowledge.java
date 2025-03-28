@@ -16,8 +16,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "user_knowledge_base")
-public class UserKnowledgeBase {
+@Table(name = "user_knowledge")
+public class UserKnowledge {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,8 +28,8 @@ public class UserKnowledgeBase {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "knowledge_base_id", nullable = false)
-    private KnowledgeBase knowledgeBase;
+    @JoinColumn(name = "knowledge_id", nullable = false)
+    private Knowledge knowledge;
 
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)

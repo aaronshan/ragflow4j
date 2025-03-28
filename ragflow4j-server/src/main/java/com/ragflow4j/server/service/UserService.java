@@ -1,6 +1,6 @@
 package com.ragflow4j.server.service;
 
-import com.ragflow4j.server.model.User;
+import com.ragflow4j.server.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

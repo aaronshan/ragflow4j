@@ -1,7 +1,7 @@
 package com.ragflow4j.server.repository;
 
-import com.ragflow4j.server.model.Knowledge;
-import com.ragflow4j.server.model.User;
+import com.ragflow4j.server.entity.Knowledge;
+import com.ragflow4j.server.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,7 +12,7 @@ import java.util.UUID;
  * 知识库数据访问层接口
  */
 @Repository
-public interface KnowledgeRepository extends JpaRepository<Knowledge, UUID> {
+public interface KnowledgeRepository extends JpaRepository<Knowledge, Long> {
     
     /**
      * 根据知识库名称查找知识库

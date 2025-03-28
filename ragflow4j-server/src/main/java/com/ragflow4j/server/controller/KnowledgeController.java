@@ -1,310 +1,160 @@
 package com.ragflow4j.server.controller;
 
-import com.ragflow4j.server.model.Document;
-import com.ragflow4j.server.model.DocumentProcessStatus;
-import com.ragflow4j.server.model.Knowledge;
-import com.ragflow4j.server.service.KnowledgeBaseService;
+import com.ragflow4j.server.entity.Knowledge;
+import com.ragflow4j.server.entity.User;
 import com.ragflow4j.server.service.KnowledgeService;
-import com.ragflow4j.core.loader.DocumentLoader;
-import com.ragflow4j.core.loader.DocumentLoaderFactory;
-import com.ragflow4j.core.parser.DocumentParser;
-import com.ragflow4j.core.parser.DocumentParserFactory;
-import com.ragflow4j.core.parser.ParseResult;
-import com.ragflow4j.core.splitter.DocumentSplitter;
-import com.ragflow4j.core.splitter.SplitterFactory;
-import com.ragflow4j.core.vectorstore.VectorStore;
-import com.ragflow4j.core.vectorstore.SearchResult;
-import com.ragflow4j.core.embedding.DocumentEmbedding;
+import com.ragflow4j.server.service.UserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 /**
- * 知识管理控制器
- * 提供知识库文档的RESTful API接口
+ * 知识库管理控制器
+ * 提供知识库元信息的RESTful API接口
  */
 @RestController
-@RequestMapping("/knowledge")
-@Api(tags = "知识管理", description = "知识库文档管理接口")
+@RequestMapping("/api/knowledges")
+@Api(tags = "知识库管理", description = "知识库元信息管理接口")
 public class KnowledgeController {
 
     private final KnowledgeService knowledgeService;
-    private final KnowledgeBaseService knowledgeBaseService;
-    private final VectorStore vectorStore;
-    private final Path fileStorageLocation;
+    private final UserService userService;
     
     @Autowired
-    public KnowledgeController(KnowledgeService knowledgeService, KnowledgeBaseService knowledgeBaseService, VectorStore vectorStore) {
+    public KnowledgeController(KnowledgeService knowledgeService, UserService userService) {
         this.knowledgeService = knowledgeService;
-        this.knowledgeBaseService = knowledgeBaseService;
-        this.vectorStore = vectorStore;
-        this.fileStorageLocation = Paths.get("./uploads").toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(this.fileStorageLocation);
-        } catch (IOException ex) {
-            throw new RuntimeException("Could not create the directory where the uploaded files will be stored.", ex);
+        this.userService = userService;
+    }
+    
+    @PostMapping
+    @ApiOperation("创建新知识库")
+    public ResponseEntity<Knowledge> createKnowledge(
+            @ApiParam("知识库信息") @Valid @RequestBody Knowledge knowledge,
+            @ApiParam("所有者ID") @RequestParam UUID ownerId) {
+        Optional<User> owner = userService.findById(ownerId);
+        if (!owner.isPresent()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
+        knowledge.setOwner(owner.get());
+        Knowledge savedKnowledge = knowledgeService.saveKnowledge(knowledge);
+        return new ResponseEntity<>(savedKnowledge, HttpStatus.CREATED);
     }
     
-    @PostMapping("/documents")
-    @ApiOperation("创建新文档")
-    public ResponseEntity<Document> createDocument(
-            @ApiParam("文档信息") @Valid @RequestBody Document document) {
-        Document savedDocument = knowledgeService.saveDocument(document);
-        return new ResponseEntity<>(savedDocument, HttpStatus.CREATED);
-    }
-    
-    @GetMapping("/documents/{id}")
-    @ApiOperation("根据ID获取文档")
-    public ResponseEntity<Document> getDocumentById(
-            @ApiParam("文档ID") @PathVariable UUID id) {
-        return knowledgeService.findDocumentById(id)
-                .map(document -> new ResponseEntity<>(document, HttpStatus.OK))
+    @GetMapping("/{id}")
+    @ApiOperation("根据ID获取知识库")
+    public ResponseEntity<Knowledge> getKnowledgeById(
+            @ApiParam("知识库ID") @PathVariable Long id) {
+        return knowledgeService.findKnowledgeById(id)
+                .map(knowledge -> new ResponseEntity<>(knowledge, HttpStatus.OK))
                 .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
     
-    @GetMapping("/documents")
-    @ApiOperation("获取所有文档（分页）")
-    public ResponseEntity<Page<Document>> getAllDocuments(
+    @GetMapping
+    @ApiOperation("获取所有知识库（分页）")
+    public ResponseEntity<Page<Knowledge>> getAllKnowledges(
             @ApiParam("页码") @RequestParam(defaultValue = "0") int page,
             @ApiParam("每页大小") @RequestParam(defaultValue = "10") int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Document> documents = knowledgeService.getAllDocuments(pageRequest);
-        return new ResponseEntity<>(documents, HttpStatus.OK);
+        Page<Knowledge> knowledgeBases = knowledgeService.getAllKnowledges(pageRequest);
+        return new ResponseEntity<>(knowledgeBases, HttpStatus.OK);
     }
     
-    @GetMapping("/documents/type/{documentType}")
-    @ApiOperation("根据文档类型获取文档")
-    public ResponseEntity<List<Document>> getDocumentsByType(
-            @ApiParam("文档类型") @PathVariable String documentType) {
-        List<Document> documents = knowledgeService.findDocumentsByType(documentType);
-        return new ResponseEntity<>(documents, HttpStatus.OK);
+    @GetMapping("/type/{type}")
+    @ApiOperation("根据类型获取知识库")
+    public ResponseEntity<List<Knowledge>> getKnowledgesByType(
+            @ApiParam("知识库类型") @PathVariable String type) {
+        List<Knowledge> knowledgeBases = knowledgeService.findKnowledgesByType(type);
+        return new ResponseEntity<>(knowledgeBases, HttpStatus.OK);
     }
     
-    @GetMapping("/documents/search")
-    @ApiOperation("根据标题关键词搜索文档")
-    public ResponseEntity<List<Document>> searchDocumentsByTitle(
-            @ApiParam("标题关键词") @RequestParam String keyword) {
-        List<Document> documents = knowledgeService.searchDocumentsByTitle(keyword);
-        return new ResponseEntity<>(documents, HttpStatus.OK);
+    @GetMapping("/search")
+    @ApiOperation("根据名称关键词搜索知识库")
+    public ResponseEntity<List<Knowledge>> searchKnowledgesByName(
+            @ApiParam("名称关键词") @RequestParam String keyword) {
+        List<Knowledge> knowledgeBases = knowledgeService.searchKnowledgesByName(keyword);
+        return new ResponseEntity<>(knowledgeBases, HttpStatus.OK);
     }
     
-    @PutMapping("/documents/{id}")
-    @ApiOperation("更新文档")
-    public ResponseEntity<Document> updateDocument(
-            @ApiParam("文档ID") @PathVariable UUID id,
-            @ApiParam("更新的文档信息") @Valid @RequestBody Document document) {
+    @GetMapping("/user/{userId}")
+    @ApiOperation("获取用户拥有的知识库")
+    public ResponseEntity<List<Knowledge>> getKnowledgesByOwner(
+            @ApiParam("用户ID") @PathVariable UUID userId) {
+        Optional<User> user = userService.findById(userId);
+        if (!user.isPresent()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        List<Knowledge> knowledgeBases = knowledgeService.findKnowledgesByOwner(user.get());
+        return new ResponseEntity<>(knowledgeBases, HttpStatus.OK);
+    }
+    
+    @GetMapping("/accessible/{userId}")
+    @ApiOperation("获取用户有权访问的知识库")
+    public ResponseEntity<List<Knowledge>> getAccessibleKnowledges(
+            @ApiParam("用户ID") @PathVariable UUID userId) {
+        Optional<User> user = userService.findById(userId);
+        if (!user.isPresent()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
+        List<Knowledge> knowledgeBases = knowledgeService.findKnowledgesByAuthorizedUser(user.get());
+        return new ResponseEntity<>(knowledgeBases, HttpStatus.OK);
+    }
+    
+    @PutMapping("/{id}")
+    @ApiOperation("更新知识库")
+    public ResponseEntity<Knowledge> updateKnowledge(
+            @ApiParam("知识库ID") @PathVariable Long id,
+            @ApiParam("更新的知识库信息") @Valid @RequestBody Knowledge knowledge) {
         try {
-            Document updatedDocument = knowledgeService.updateDocument(id, document);
-            return new ResponseEntity<>(updatedDocument, HttpStatus.OK);
+            Knowledge updatedKnowledge = knowledgeService.updateKnowledge(id, knowledge);
+            return new ResponseEntity<>(updatedKnowledge, HttpStatus.OK);
         } catch (RuntimeException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
     }
     
-    @DeleteMapping("/documents/{id}")
-    @ApiOperation("删除文档")
-    public ResponseEntity<Void> deleteDocument(
-            @ApiParam("文档ID") @PathVariable UUID id) {
-        knowledgeService.deleteDocument(id);
+    @DeleteMapping("/{id}")
+    @ApiOperation("删除知识库")
+    public ResponseEntity<Void> deleteKnowledge(
+            @ApiParam("知识库ID") @PathVariable Long id) {
+        knowledgeService.deleteKnowledge(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
     
-    @GetMapping("/documents/vector/{vectorId}")
-    @ApiOperation("根据向量ID获取文档")
-    public ResponseEntity<Document> getDocumentByVectorId(
-            @ApiParam("向量ID") @PathVariable String vectorId) {
-        return knowledgeService.findDocumentByVectorId(vectorId)
-                .map(document -> new ResponseEntity<>(document, HttpStatus.OK))
-                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-    }
-    
-    @PostMapping("/documents/upload")
-    @ApiOperation("上传文档到知识库")
-    public ResponseEntity<Document> uploadDocument(
-            @ApiParam("文件") @RequestParam("file") MultipartFile file,
-            @ApiParam("知识库ID") @RequestParam("knowledgeBaseId") UUID knowledgeBaseId,
-            @ApiParam("文档类型") @RequestParam("documentType") String documentType) {
+    @PostMapping("/{knowledgeId}/authorize/{userId}")
+    @ApiOperation("授权用户访问知识库")
+    public ResponseEntity<Void> authorizeUser(
+            @ApiParam("知识库ID") @PathVariable Long knowledgeId,
+            @ApiParam("用户ID") @PathVariable UUID userId) {
         try {
-            // 保存文件到本地存储
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            Path targetLocation = this.fileStorageLocation.resolve(fileName);
-            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            
-            // 创建文档对象
-            Document document = new Document();
-            document.setTitle(file.getOriginalFilename());
-            document.setDocumentType(documentType);
-            document.setFilePath(targetLocation.toString());
-            document.setFileSize(file.getSize());
-            document.setMimeType(file.getContentType());
-            document.setProcessStatus(DocumentProcessStatus.UPLOADED);
-            
-            // 关联到知识库
-            Knowledge knowledge = knowledgeBaseService.findKnowledgeBaseById(knowledgeBaseId)
-                    .orElseThrow(() -> new RuntimeException("Knowledge base not found with id: " + knowledgeBaseId));
-            document.setKnowledge(knowledge);
-            
-            // 保存文档
-            Document savedDocument = knowledgeService.saveDocument(document);
-            
-            // 异步处理文档
-            processDocumentAsync(savedDocument);
-            
-            return new ResponseEntity<>(savedDocument, HttpStatus.CREATED);
-        } catch (IOException ex) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            knowledgeService.authorizeUser(knowledgeId, userId);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
     }
     
-    @GetMapping("/documents/download/{id}")
-    @ApiOperation("下载文档")
-    public ResponseEntity<Resource> downloadDocument(@ApiParam("文档ID") @PathVariable UUID id) {
+    @DeleteMapping("/{knowledgeId}/authorize/{userId}")
+    @ApiOperation("撤销用户访问知识库的权限")
+    public ResponseEntity<Void> revokeUserAuthorization(
+            @ApiParam("知识库ID") @PathVariable Long knowledgeId,
+            @ApiParam("用户ID") @PathVariable UUID userId) {
         try {
-            Optional<Document> documentOpt = knowledgeService.findDocumentById(id);
-            if (!documentOpt.isPresent()) {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-            
-            Document document = documentOpt.get();
-            Path filePath = Paths.get(document.getFilePath());
-            Resource resource = new UrlResource(filePath.toUri());
-            
-            if (resource.exists()) {
-                return ResponseEntity.ok()
-                        .contentType(MediaType.parseMediaType(document.getMimeType()))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + document.getTitle() + "\"")
-                        .body(resource);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
-        } catch (MalformedURLException ex) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+            knowledgeService.revokeUserAuthorization(knowledgeId, userId);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-    }
-    
-    @GetMapping("/documents/{id}/status")
-    @ApiOperation("获取文档处理状态")
-    public ResponseEntity<DocumentProcessStatus> getDocumentProcessStatus(
-            @ApiParam("文档ID") @PathVariable UUID id) {
-        return knowledgeService.findDocumentById(id)
-                .map(document -> new ResponseEntity<>(document.getProcessStatus(), HttpStatus.OK))
-                .orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
-    }
-    
-    /**
-     * 异步处理文档：加载、解析、切分和向量化
-     * 
-     * @param document 要处理的文档
-     * @return 处理完成的Future
-     */
-    private CompletableFuture<Void> processDocumentAsync(Document document) {
-        return CompletableFuture.runAsync(() -> {
-            try {
-                // 1. 更新状态为解析中
-                document.setProcessStatus(DocumentProcessStatus.PARSING);
-                knowledgeService.saveDocument(document);
-                
-                // 2. 加载文档
-                Path filePath = Paths.get(document.getFilePath());
-                DocumentLoader loader = DocumentLoaderFactory.getLoader(filePath)
-                    .orElseThrow(() -> new RuntimeException("No suitable document loader found for file: " + filePath));
-                String content = loader.load(filePath);
-                
-                // 3. 解析文档
-                DocumentParser parser = DocumentParserFactory.getParser(document.getMimeType());
-                ParseResult parseResult = parser.parse(content);
-                
-                // 4. 更新文档内容和状态
-                document.setTitle(parseResult.getTitle());
-                document.setContent(content);
-                document.setProcessStatus(DocumentProcessStatus.PARSED);
-                knowledgeService.saveDocument(document);
-                
-                // 5. 切分文档
-                document.setProcessStatus(DocumentProcessStatus.SPLITTING);
-                knowledgeService.saveDocument(document);
-                
-                DocumentSplitter splitter = SplitterFactory.getSplitter(document.getDocumentType());
-                List<String> chunks = splitter.split(content);
-                
-                document.setProcessStatus(DocumentProcessStatus.SPLIT);
-                knowledgeService.saveDocument(document);
-                
-                // 6. 向量化处理
-                document.setProcessStatus(DocumentProcessStatus.VECTORIZING);
-                knowledgeService.saveDocument(document);
-                
-                try {
-                    // 使用DocumentEmbedding服务将文本块转换为向量
-                    List<float[]> vectors = new ArrayList<>();
-                    List<String> metadatas = new ArrayList<>();
-                    
-                    for (int i = 0; i < chunks.size(); i++) {
-                        String chunk = chunks.get(i);
-                        // 构建元数据JSON
-                        String metadata = String.format("{\"documentId\":\"%s\",\"chunkIndex\":%d,\"title\":\"%s\"}", 
-                                document.getId().toString(), i, document.getTitle());
-                        
-                        // 将文本转换为向量
-                        float[] vector = vectorStore instanceof DocumentEmbedding ? 
-                                ((DocumentEmbedding) vectorStore).embed(chunk) : 
-                                new float[0]; // 如果vectorStore不是DocumentEmbedding的实例，则使用空向量
-                        
-                        vectors.add(vector);
-                        metadatas.add(metadata);
-                    }
-                    
-                    // 将向量存储到向量数据库
-                    CompletableFuture<Boolean> future = vectorStore.addVectors(vectors, metadatas);
-                    Boolean result = future.get(); // 等待向量存储完成
-                    
-                    if (result) {
-                        // 更新文档状态为已向量化
-                        document.setProcessStatus(DocumentProcessStatus.VECTORIZED);
-                        // 设置向量ID（这里假设使用文档ID作为向量ID）
-                        document.setVectorId(document.getId().toString());
-                        knowledgeService.saveDocument(document);
-                    } else {
-                        throw new RuntimeException("Failed to store vectors in vector database");
-                    }
-                } catch (Exception e) {
-                    document.setProcessStatus(DocumentProcessStatus.FAILED);
-                    document.setFailureReason("Vector processing failed: " + e.getMessage());
-                    knowledgeService.saveDocument(document);
-                    throw e; // 重新抛出异常以便外层catch捕获
-                }
-                
-            } catch (Exception e) {
-                document.setProcessStatus(DocumentProcessStatus.FAILED);
-                document.setFailureReason(e.getMessage());
-                knowledgeService.saveDocument(document);
-            }
-        });
     }
 }

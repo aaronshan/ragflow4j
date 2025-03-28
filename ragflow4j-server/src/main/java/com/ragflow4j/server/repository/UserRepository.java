@@ -1,6 +1,6 @@
 package com.ragflow4j.server.repository;
 
-import com.ragflow4j.server.model.User;
+import com.ragflow4j.server.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
